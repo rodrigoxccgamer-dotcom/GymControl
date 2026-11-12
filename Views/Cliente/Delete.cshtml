@@ -1,0 +1,40 @@
+
+@model GymControl.Models.Cliente
+
+@{
+    ViewData["Title"] = "Eliminar Cliente";
+}
+
+<h2>Eliminar Cliente</h2>
+
+<div class="alert alert-danger">
+    ¿Estás seguro de que deseas eliminar este cliente?
+</div>
+
+<div class="card">
+    <div class="card-body">
+
+        <h4>@Model.Nombres @Model.Apellidos</h4>
+
+        <p><strong>CI:</strong> @Model.CI</p>
+        <p><strong>Teléfono:</strong> @Model.Telefono</p>
+        <p><strong>Correo:</strong> @Model.Correo</p>
+
+        <form asp-controller="Cliente"
+              asp-action="Delete"
+              asp-route-id="@Model.Id"
+              method="post">
+
+            @Html.AntiForgeryToken()
+
+            <button type="submit" class="btn btn-danger">
+                Sí, eliminar
+            </button>
+
+            <a asp-action="Index" class="btn btn-secondary">
+                Cancelar
+            </a>
+        </form>
+
+    </div>
+</div>

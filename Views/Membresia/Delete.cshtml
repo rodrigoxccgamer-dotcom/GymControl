@@ -1,0 +1,68 @@
+
+@model GymControl.Models.Membresia
+
+@{
+    ViewData["Title"] = "Eliminar Membresía";
+}
+
+<h2>Eliminar Membresía</h2>
+
+<div class="alert alert-danger">
+    ¿Estás seguro de que deseas eliminar esta membresía?
+</div>
+
+<div class="card">
+    <div class="card-body">
+
+        <h4>Información de la Membresía</h4>
+
+        <p>
+            <strong>Cliente:</strong>
+            @Model.NombreCliente
+        </p>
+
+        <p>
+            <strong>Tipo:</strong>
+            @Model.Tipo
+        </p>
+
+        <p>
+            <strong>Precio:</strong>
+            Bs @Model.Precio.ToString("N2")
+        </p>
+
+        <p>
+            <strong>Inicio:</strong>
+            @Model.FechaInicio.ToString("dd/MM/yyyy")
+        </p>
+
+        <p>
+            <strong>Fin:</strong>
+            @Model.FechaFin.ToString("dd/MM/yyyy")
+        </p>
+
+        <p>
+            <strong>Estado:</strong>
+            @Model.Estado
+        </p>
+
+        <form asp-controller="Membresia"
+              asp-action="Delete"
+              asp-route-id="@Model.Id"
+              method="post">
+
+            @Html.AntiForgeryToken()
+
+            <button type="submit"
+                    class="btn btn-danger">
+                Sí, eliminar
+            </button>
+
+            <a asp-action="Index"
+               class="btn btn-secondary">
+                Cancelar
+            </a>
+
+        </form>
+    </div>
+</div>

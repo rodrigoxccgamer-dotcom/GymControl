@@ -1,0 +1,63 @@
+
+@model GymControl.Models.Pago
+
+@{
+    ViewData["Title"] = "Eliminar Pago";
+}
+
+<h2>Eliminar Pago</h2>
+
+<div class="alert alert-danger">
+    ¿Estás seguro de que deseas eliminar este pago?
+</div>
+
+<div class="card">
+    <div class="card-body">
+
+        <h4>Información del Pago</h4>
+
+        <p>
+            <strong>Cliente:</strong>
+            @Model.NombreCliente
+        </p>
+
+        <p>
+            <strong>Membresía:</strong>
+            @Model.TipoMembresia
+        </p>
+
+        <p>
+            <strong>Monto:</strong>
+            Bs @Model.Monto.ToString("N2")
+        </p>
+
+        <p>
+            <strong>Fecha:</strong>
+            @Model.FechaPago.ToString("dd/MM/yyyy")
+        </p>
+
+        <p>
+            <strong>Método de Pago:</strong>
+            @Model.MetodoPago
+        </p>
+
+        <form asp-controller="Pago"
+              asp-action="Delete"
+              asp-route-id="@Model.Id"
+              method="post">
+
+            @Html.AntiForgeryToken()
+
+            <button type="submit"
+                    class="btn btn-danger">
+                Sí, eliminar
+            </button>
+
+            <a asp-action="Index"
+               class="btn btn-secondary">
+                Cancelar
+            </a>
+
+        </form>
+    </div>
+</div>
