@@ -2,24 +2,26 @@
 @model List<GymControl.Models.Cliente>
 
 @{
-    ViewData["Title"] = "Clientes";
+    ViewData["Title"] = "Gestión de Clientes";
 }
 
 <h2>Gestión de Clientes</h2>
 
-<p>Lista de clientes registrados en GymControl.</p>
+<p>Administra los clientes registrados en GymControl.</p>
 
-
-<a asp-controller="Cliente"
-   asp-action="Create"
-   class="btn btn-primary mb-3">
+<button type="button"
+        class="btn btn-primary mb-3"
+        data-bs-toggle="modal"
+        data-bs-target="#modalCliente">
     + Nuevo Cliente
-</a>
+</button>
 
 @if (TempData["Mensaje"] != null)
 {
     <div class="alert alert-success">
         @TempData["Mensaje"]
+    </div>
+}
 
 @if (TempData["Error"] != null)
 {
@@ -28,60 +30,456 @@
     </div>
 }
 
-    </div>
-}
-
-
-<table class="table table-bordered table-striped">
-    <thead class="table-dark">
-        <tr>
-            <th>ID</th>
-            <th>Nombres</th>
-            <th>Apellidos</th>
-            <th>CI</th>
-            <th>Teléfono</th>
-            <th>Correo</th>
-            <th>Fecha de Registro</th>
-            <th>Acciones</th>
-        </tr>
-    </thead>
-
-    <tbody>
-        @foreach (var cliente in Model)
-        {
+<div class="table-responsive">
+    <table class="table table-bordered table-striped">
+        <thead class="table-dark">
             <tr>
-                <td>@cliente.Id</td>
-                <td>@cliente.Nombres</td>
-                <td>@cliente.Apellidos</td>
-                <td>@cliente.CI</td>
-                <td>@cliente.Telefono</td>
-                <td>@cliente.Correo</td>
-                <td>@cliente.FechaRegistro.ToString("dd/MM/yyyy")</td>
-
-
-<td>
-    <a asp-controller="Cliente"
-       asp-action="Edit"
-       asp-route-id="@cliente.Id"
-       class="btn btn-warning btn-sm">
-        Editar
-    </a>
-
-    <a asp-controller="Cliente"
-       asp-action="Delete"
-       asp-route-id="@cliente.Id"
-       class="btn btn-danger btn-sm">
-        Eliminar
-    </a>
-</td>
+                <th>ID</th>
+                <th>Nombres</th>
+                <th>Apellidos</th>
+                <th>CI</th>
+                <th>Teléfono</th>
+                <th>Correo</th>
+                <th>Fecha de Registro</th>
+                <th>Acciones</th>
             </tr>
-        }
-    </tbody>
-</table>
+        </thead>
+
+        <tbody>
+            @foreach (var cliente in Model)
+            {
+                <tr>
+                    <td>@cliente.Id</td>
+                    <td>@cliente.Nombres</td>
+                    <td>@cliente.Apellidos</td>
+                    <td>@cliente.CI</td>
+                    <td>@cliente.Telefono</td>
+                    <td>@cliente.Correo</td>
+                    <td>
+                        @cliente.FechaRegistro.ToString("dd/MM/yyyy")
+                    </td>
+
+                    <td>
+                        <div class="d-flex gap-2">
+                            <a href="@Url.Action("Edit", "Cliente", new { id = cliente.Id })"
+                               class="btn btn-warning btn-sm">
+                                Editar
+                            </a>
+
+                            <a href="@Url.Action("Delete", "Cliente", new { id = cliente.Id })"
+                               class="btn btn-danger btn-sm">
+                                Eliminar
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
 
 @if (Model.Count == 0)
 {
     <div class="alert alert-info">
         Todavía no existen clientes registrados.
     </div>
+}
+
+<div class="modal fade"
+     id="modalCliente"
+     tabindex="-1"
+     aria-labelledby="tituloModalCliente"
+     aria-hidden="true">
+
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+
+            <div class="modal-header">
+                <h5 class="modal-title" id="tituloModalCliente">
+                    Registrar nuevo cliente
+                </h5>
+
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="modal"
+                        aria-label="Cerrar">
+                </button>
+            </div>
+
+            <form id="formCliente"
+                  asp-controller="Cliente"
+                  asp-action="CreateModal"
+                  method="post"
+                  novalidate>
+
+                @Html.AntiForgeryToken()
+
+                <div class="modal-body">
+
+                    <p class="text-muted small">
+                        Complete los datos del nuevo cliente.
+                        Los campos con * son obligatorios.
+                    </p>
+
+                    <div id="erroresCliente"
+                         class="alert alert-danger d-none"
+                         role="alert">
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="Nombres" class="form-label">
+                            Nombres *
+                        </label>
+
+                        <input type="text"
+                               id="Nombres"
+                               name="Nombres"
+                               maxlength="100"
+                               class="form-control"
+                               placeholder="Ingrese los nombres"
+                               required />
+
+                        <span data-error-for="Nombres"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="Apellidos" class="form-label">
+                            Apellidos *
+                        </label>
+
+                        <input type="text"
+                               id="Apellidos"
+                               name="Apellidos"
+                               maxlength="100"
+                               class="form-control"
+                               placeholder="Ingrese los apellidos"
+                               required />
+
+                        <span data-error-for="Apellidos"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="CI" class="form-label">
+                            Carnet de identidad *
+                        </label>
+
+                        <input type="text"
+                               id="CI"
+                               name="CI"
+                               maxlength="20"
+                               class="form-control"
+                               placeholder="Ingrese el CI"
+                               required />
+
+                        <span data-error-for="CI"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="Telefono" class="form-label">
+                            Teléfono
+                        </label>
+
+                        <input type="tel"
+                               id="Telefono"
+                               name="Telefono"
+                               maxlength="20"
+                               class="form-control"
+                               placeholder="Ingrese un teléfono" />
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="Correo" class="form-label">
+                            Correo electrónico
+                        </label>
+
+                        <input type="email"
+                               id="Correo"
+                               name="Correo"
+                               maxlength="120"
+                               class="form-control"
+                               placeholder="ejemplo@correo.com" />
+
+                        <span data-error-for="Correo"
+                              class="text-danger small"></span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">
+                            Fecha de registro
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               value="@DateTime.Today.ToString("dd/MM/yyyy")"
+                               readonly />
+
+                        <small class="text-muted">
+                            Se asigna automáticamente.
+                        </small>
+                    </div>
+
+                </div>
+
+                <div class="modal-footer">
+
+                    <small class="text-muted me-auto">
+                        Esc: cancelar | Enter o Ctrl+S: guardar
+                    </small>
+
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+
+                    <button type="submit"
+                            class="btn btn-primary"
+                            id="btnGuardarCliente">
+                        Guardar cliente
+                    </button>
+
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    const modalElemento =
+        document.getElementById("modalCliente");
+
+    const formulario =
+        document.getElementById("formCliente");
+
+    const botonGuardar =
+        document.getElementById("btnGuardarCliente");
+
+    const cajaErrores =
+        document.getElementById("erroresCliente");
+
+    const modal =
+        bootstrap.Modal.getOrCreateInstance(modalElemento);
+
+    let datosModificados = false;
+    let guardando = false;
+
+    modalElemento.addEventListener("shown.bs.modal", function () {
+        document.getElementById("Nombres").focus();
+    });
+
+    formulario.addEventListener("input", function (evento) {
+        if (evento.target.name !== "__RequestVerificationToken") {
+            datosModificados = true;
+        }
+    });
+
+    formulario.addEventListener("change", function () {
+        datosModificados = true;
+    });
+
+    modalElemento.addEventListener("hide.bs.modal", function (evento) {
+
+        if (guardando) {
+            evento.preventDefault();
+            return;
+        }
+
+        if (datosModificados) {
+            const confirmar = window.confirm(
+                "Tiene datos sin guardar. ¿Desea cerrar y descartarlos?"
+            );
+
+            if (!confirmar) {
+                evento.preventDefault();
+            }
+        }
+    });
+
+    modalElemento.addEventListener("hidden.bs.modal", function () {
+        formulario.reset();
+        limpiarErrores();
+        datosModificados = false;
+    });
+
+    document.addEventListener("keydown", function (evento) {
+
+        if (!modalElemento.classList.contains("show")) {
+            return;
+        }
+
+        if (evento.ctrlKey &&
+            evento.key.toLowerCase() === "s") {
+
+            evento.preventDefault();
+
+            if (!guardando) {
+                formulario.requestSubmit();
+            }
+        }
+    });
+
+    function limpiarErrores() {
+
+        cajaErrores.textContent = "";
+        cajaErrores.classList.add("d-none");
+
+        document.querySelectorAll("[data-error-for]")
+            .forEach(function (elemento) {
+                elemento.textContent = "";
+            });
+
+        formulario.querySelectorAll(".is-invalid")
+            .forEach(function (elemento) {
+                elemento.classList.remove("is-invalid");
+            });
+    }
+
+    function mostrarError(campo, mensaje) {
+
+        const elemento = formulario.elements.namedItem(campo);
+
+        const etiqueta =
+            formulario.querySelector(
+                '[data-error-for="' + campo + '"]'
+            );
+
+        if (elemento && elemento.classList) {
+            elemento.classList.add("is-invalid");
+        }
+
+        if (etiqueta) {
+            etiqueta.textContent = mensaje;
+        }
+    }
+
+    function validarFormulario() {
+
+        let valido = true;
+
+        const nombres =
+            formulario.elements.namedItem("Nombres").value.trim();
+
+        const apellidos =
+            formulario.elements.namedItem("Apellidos").value.trim();
+
+        const ci =
+            formulario.elements.namedItem("CI").value.trim();
+
+        const correo =
+            formulario.elements.namedItem("Correo").value.trim();
+
+        if (!nombres) {
+            mostrarError(
+                "Nombres",
+                "Por favor, ingrese los nombres del cliente."
+            );
+            valido = false;
+        }
+
+        if (!apellidos) {
+            mostrarError(
+                "Apellidos",
+                "Por favor, ingrese los apellidos."
+            );
+            valido = false;
+        }
+
+        if (!ci) {
+            mostrarError(
+                "CI",
+                "Por favor, ingrese el carnet de identidad."
+            );
+            valido = false;
+        }
+
+        if (correo &&
+            !formulario.elements.namedItem("Correo").checkValidity()) {
+
+            mostrarError(
+                "Correo",
+                "Ingrese un correo válido, por ejemplo: nombre@correo.com."
+            );
+
+            valido = false;
+        }
+
+        return valido;
+    }
+    formulario.addEventListener("submit", async function (evento) {
+
+        evento.preventDefault();
+
+        if (guardando) return;
+
+        limpiarErrores();
+
+        if (!validarFormulario()) {
+            return;
+        }
+
+        guardando = true;
+        botonGuardar.disabled = true;
+        botonGuardar.textContent = "Guardando...";
+
+        try {
+
+            const respuesta = await fetch(formulario.action, {
+                method: "POST",
+                body: new FormData(formulario)
+            });
+
+            const resultado = await respuesta.json();
+
+            if (respuesta.ok && resultado.ok) {
+
+                datosModificados = false;
+
+                window.location.reload();
+                return;
+            }
+
+            if (resultado.errors) {
+
+                for (const campo in resultado.errors) {
+
+                    const mensajes = resultado.errors[campo];
+
+                    if (campo) {
+                        mostrarError(campo, mensajes.join(" "));
+                    } else {
+                        cajaErrores.textContent = mensajes.join(" ");
+                        cajaErrores.classList.remove("d-none");
+                    }
+                }
+            } else {
+                cajaErrores.textContent =
+                    "No se pudo guardar el cliente. Revise los datos.";
+
+                cajaErrores.classList.remove("d-none");
+            }
+
+        } catch (error) {
+
+            cajaErrores.textContent =
+                "No se pudo completar el registro. Intente nuevamente.";
+
+            cajaErrores.classList.remove("d-none");
+
+        } finally {
+
+            guardando = false;
+            botonGuardar.disabled = false;
+            botonGuardar.textContent = "Guardar cliente";
+        }
+    });
+
+});
+</script>
 }
