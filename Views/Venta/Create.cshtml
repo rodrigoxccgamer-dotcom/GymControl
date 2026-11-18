@@ -1,0 +1,381 @@
+
+@model GymControl.Models.Venta
+
+@{
+    ViewData["Title"] = "Registrar Venta";
+
+    var clientes = ViewBag.Clientes as List<GymControl.Models.Cliente>
+                   ?? new List<GymControl.Models.Cliente>();
+
+    var productos = ViewBag.Productos as List<GymControl.Models.Producto>
+                    ?? new List<GymControl.Models.Producto>();
+}
+
+<div class="container mt-4">
+
+    <h2>Registrar Nueva Venta</h2>
+    <p>Selecciona un cliente y agrega los planes de gimnasio.</p>
+
+    @if (TempData["Mensaje"] != null)
+    {
+        <div class="alert alert-success">
+            @TempData["Mensaje"]
+        </div>
+    }
+
+    <form asp-controller="Venta"
+          asp-action="Create"
+          method="post">
+
+        @Html.AntiForgeryToken()
+
+        <div asp-validation-summary="All"
+             class="alert alert-danger">
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <strong>Datos de la venta</strong>
+            </div>
+
+            <div class="card-body">
+
+                <div class="row">
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            Cliente
+                        </label>
+
+                        <select asp-for="ClienteId"
+                                class="form-select"
+                                required>
+
+                            <option value="">
+                                Seleccione un cliente
+                            </option>
+
+                            @foreach (var cliente in clientes)
+                            {
+                                <option value="@cliente.Id">
+                                    @cliente.Nombres @cliente.Apellidos
+                                </option>
+                            }
+                        </select>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">
+                            Fecha de venta
+                        </label>
+
+                        <input type="text"
+                               class="form-control"
+                               value="@DateTime.Now.ToString("dd/MM/yyyy HH:mm")"
+                               readonly />
+                    </div>
+
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card mb-4">
+
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>Detalle de productos</strong>
+
+                <button type="button"
+                        class="btn btn-primary btn-sm"
+                        id="agregarProducto">
+                    + Agregar plan
+                </button>
+            </div>
+
+            <div class="card-body">
+
+                <div class="table-responsive">
+
+                    <table class="table table-bordered"
+                           id="tablaDetalles">
+
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Plan</th>
+                                <th>Precio (Bs)</th>
+                                <th>Cantidad</th>
+                                <th>Subtotal (Bs)</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="detalleBody">
+
+                            @for (int i = 0; i < Model.Detalles.Count; i++)
+                            {
+                                <tr class="detalle-row">
+
+                                    <td>
+                                        <select name="Detalles[@i].ProductoId"
+                                                class="form-select producto-select"
+                                                required>
+
+                                            <option value="">
+                                                Seleccione un plan
+                                            </option>
+
+                                            @foreach (var producto in productos)
+                                            {
+                                                <option value="@producto.Id"
+                                                        data-precio="@producto.Precio"
+                                                        selected="@(Model.Detalles[i].ProductoId == producto.Id)">
+                                                    @producto.Nombre
+                                                </option>
+                                            }
+                                        </select>
+                                    </td>
+
+                                    <td>
+                                        <input type="text"
+                                               class="form-control precio"
+                                               value="0.00"
+                                               readonly />
+                                    </td>
+
+                                    <td>
+                                        <input type="number"
+                                               name="Detalles[@i].Cantidad"
+                                               class="form-control cantidad"
+                                               value="@(Model.Detalles[i].Cantidad > 0 ? Model.Detalles[i].Cantidad : 1)"
+                                               min="1"
+                                               required />
+                                    </td>
+
+                                    <td>
+                                        <input type="text"
+                                               class="form-control subtotal"
+                                               value="0.00"
+                                               readonly />
+                                    </td>
+
+                                    <td>
+                                        <button type="button"
+                                                class="btn btn-danger btn-sm eliminar">
+                                            Quitar
+                                        </button>
+                                    </td>
+
+                                </tr>
+                            }
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+                <div class="text-end mt-3">
+
+                    <h4>
+                        Total:
+                        <span class="text-success">
+                            Bs <span id="totalVenta">0.00</span>
+                        </span>
+                    </h4>
+
+                </div>
+
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 mb-5">
+
+            <button type="submit"
+                    class="btn btn-success">
+                Confirmar venta
+            </button>
+
+            <a asp-controller="Home"
+               asp-action="Index"
+               class="btn btn-secondary">
+                Cancelar
+            </a>
+
+        </div>
+
+    </form>
+
+</div>
+
+<template id="detalleTemplate">
+
+    <tr class="detalle-row">
+
+        <td>
+            <select name="Detalles[__index__].ProductoId"
+                    class="form-select producto-select"
+                    required>
+
+                <option value="">
+                    Seleccione un plan
+                </option>
+
+                @foreach (var producto in productos)
+                {
+                    <option value="@producto.Id"
+                            data-precio="@producto.Precio">
+                        @producto.Nombre
+                    </option>
+                }
+
+            </select>
+        </td>
+
+        <td>
+            <input type="text"
+                   class="form-control precio"
+                   value="0.00"
+                   readonly />
+        </td>
+
+        <td>
+            <input type="number"
+                   name="Detalles[__index__].Cantidad"
+                   class="form-control cantidad"
+                   value="1"
+                   min="1"
+                   required />
+        </td>
+
+        <td>
+            <input type="text"
+                   class="form-control subtotal"
+                   value="0.00"
+                   readonly />
+        </td>
+
+        <td>
+            <button type="button"
+                    class="btn btn-danger btn-sm eliminar">
+                Quitar
+            </button>
+        </td>
+
+    </tr>
+
+</template>
+
+@section Scripts {
+
+    <script>
+
+        const detalleBody = document.getElementById("detalleBody");
+        const template = document.getElementById("detalleTemplate");
+
+        function actualizarIndices() {
+
+            const filas = detalleBody.querySelectorAll(".detalle-row");
+
+            filas.forEach((fila, index) => {
+
+                fila.querySelectorAll("[name]").forEach(input => {
+
+                    input.name = input.name.replace(
+                        /Detalles\[\d+\]/,
+                        `Detalles[${index}]`
+                    );
+
+                });
+
+            });
+
+        }
+
+        function calcularFila(fila) {
+
+            const select = fila.querySelector(".producto-select");
+            const cantidadInput = fila.querySelector(".cantidad");
+
+            const opcion = select.options[select.selectedIndex];
+
+            const precio = parseFloat(opcion?.dataset.precio || 0);
+            const cantidad = parseInt(cantidadInput.value) || 0;
+
+            const subtotal = precio * cantidad;
+
+            fila.querySelector(".precio").value = precio.toFixed(2);
+            fila.querySelector(".subtotal").value = subtotal.toFixed(2);
+
+            calcularTotal();
+        }
+
+        function calcularTotal() {
+
+            let total = 0;
+
+            detalleBody.querySelectorAll(".subtotal").forEach(input => {
+
+                total += parseFloat(input.value) || 0;
+
+            });
+
+            document.getElementById("totalVenta").textContent =
+                total.toFixed(2);
+        }
+
+        document.getElementById("agregarProducto")
+            .addEventListener("click", function () {
+
+                const indice = detalleBody.querySelectorAll(".detalle-row").length;
+
+                const html = template.innerHTML.replaceAll(
+                    "__index__",
+                    indice
+                );
+
+                detalleBody.insertAdjacentHTML("beforeend", html);
+
+                actualizarIndices();
+                calcularTotal();
+            });
+
+        detalleBody.addEventListener("change", function (e) {
+
+            if (e.target.classList.contains("producto-select")) {
+
+                calcularFila(e.target.closest(".detalle-row"));
+
+            }
+
+        });
+
+        detalleBody.addEventListener("input", function (e) {
+
+            if (e.target.classList.contains("cantidad")) {
+
+                calcularFila(e.target.closest(".detalle-row"));
+
+            }
+
+        });
+
+        detalleBody.addEventListener("click", function (e) {
+
+            if (e.target.classList.contains("eliminar")) {
+
+                e.target.closest(".detalle-row").remove();
+
+                actualizarIndices();
+                calcularTotal();
+
+            }
+
+        });
+
+        detalleBody.querySelectorAll(".detalle-row").forEach(fila => {
+            calcularFila(fila);
+        });
+
+    </script>
+
+}

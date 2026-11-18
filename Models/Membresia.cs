@@ -28,7 +28,6 @@ namespace GymControl.Models
         [Required(ErrorMessage = "El estado es obligatorio")]
         public string Estado { get; set; } = "Activa";
 
-        // Propiedad auxiliar para mostrar el cliente
         public string NombreCliente { get; set; } = "";
     }
 }

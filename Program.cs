@@ -1,10 +1,18 @@
+
+using GymControl.Data;
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
 builder.Services.AddScoped<GymControl.Data.ClienteDAO>();
 builder.Services.AddScoped<GymControl.Data.MembresiaDAO>();
 builder.Services.AddScoped<GymControl.Data.PagoDAO>();
+
+builder.Services.AddScoped<ProductoDAO>();
+builder.Services.AddScoped<VentaDAO>();
+
 
 
 var app = builder.Build();
