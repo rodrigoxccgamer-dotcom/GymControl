@@ -24,6 +24,7 @@ namespace GymControl.Controllers
             _productoDAO = productoDAO;
         }
 
+        // READ: Historial de ventas
         [HttpGet]
         public IActionResult Index()
         {
@@ -31,6 +32,7 @@ namespace GymControl.Controllers
             return View(ventas);
         }
 
+        // GET: Mostrar formulario
         [HttpGet]
         public IActionResult Create()
         {
@@ -39,6 +41,8 @@ namespace GymControl.Controllers
             var venta = new Venta
             {
                 FechaVenta = DateTimeOffset.Now,
+                PorcentajeDescuento = 0,
+                Vendedor = string.Empty,
                 Detalles = new List<DetalleVenta>
                 {
                     new DetalleVenta()
@@ -48,6 +52,7 @@ namespace GymControl.Controllers
             return View(venta);
         }
 
+        // POST: Registrar venta con descuento
         [HttpPost]
         [ValidateAntiForgeryToken]
         public IActionResult Create(Venta venta)
@@ -56,6 +61,33 @@ namespace GymControl.Controllers
                 new List<DetalleVenta>())
                 .Where(d => d.ProductoId > 0 && d.Cantidad > 0)
                 .ToList();
+
+            // Validar vendedor
+            if (string.IsNullOrWhiteSpace(venta.Vendedor))
+            {
+                ModelState.AddModelError(
+                    nameof(Venta.Vendedor),
+                    "Ingresa el nombre del vendedor para registrar la venta."
+                );
+            }
+            else if (venta.Vendedor.Trim().Length > 120)
+            {
+                ModelState.AddModelError(
+                    nameof(Venta.Vendedor),
+                    "El nombre del vendedor no puede superar 120 caracteres."
+                );
+            }
+
+            // Validar porcentaje de descuento
+            if (venta.PorcentajeDescuento < 0 ||
+                venta.PorcentajeDescuento > 20)
+            {
+                ModelState.AddModelError(
+                    nameof(Venta.PorcentajeDescuento),
+                    "El descuento debe estar entre 0% y 20%. " +
+                    "Puedes ajustar el porcentaje e intentarlo nuevamente."
+                );
+            }
 
             if (!ModelState.IsValid)
             {
@@ -69,20 +101,26 @@ namespace GymControl.Controllers
 
                 TempData["Mensaje"] =
                     $"Venta #{id} registrada correctamente. " +
-                    $"Total: Bs {venta.Total:N2}.";
+                    $"Vendedor: {venta.Vendedor}. " +
+                    $"Total bruto: Bs {venta.Total:N2}. " +
+                    $"Descuento: Bs {venta.MontoDescuento:N2}. " +
+                    $"Total final: Bs {venta.TotalFinal:N2}.";
 
                 return RedirectToAction(nameof(Index));
             }
             catch (ArgumentException ex)
             {
-                ModelState.AddModelError(string.Empty, ex.Message);
+                ModelState.AddModelError(
+                    string.Empty,
+                    ex.Message
+                );
             }
             catch (Exception)
             {
                 ModelState.AddModelError(
                     string.Empty,
-                    "Ocurrió un error al registrar la venta. " +
-                    "Verifique los datos e intente nuevamente."
+                    "No pudimos registrar la venta. " +
+                    "Verifica los datos e inténtalo nuevamente."
                 );
             }
 
@@ -90,6 +128,7 @@ namespace GymControl.Controllers
             return View(venta);
         }
 
+        // Preparar listas para los formularios
         private void PrepararListas()
         {
             ViewBag.Clientes = _clienteDAO.ObtenerTodos();

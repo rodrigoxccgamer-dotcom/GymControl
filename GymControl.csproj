@@ -11,4 +11,12 @@
     <PackageReference Include="Npgsql" Version="10.0.3" />
   </ItemGroup>
 
+<ItemGroup>
+  <!-- Evitar que el proyecto principal compile los archivos xUnit -->
+  <Compile Remove="GymControl.Tests/**/*.cs" />
+  <Content Remove="GymControl.Tests/**" />
+  <EmbeddedResource Remove="GymControl.Tests/**" />
+  <None Remove="GymControl.Tests/**" />
+</ItemGroup>
+
 </Project>

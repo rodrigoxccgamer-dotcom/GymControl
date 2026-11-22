@@ -25,20 +25,42 @@ namespace GymControl.Data
             _conexion = builder.ConnectionString;
         }
 
-        // CREATE: Registrar venta con sus detalles
+        // CREATE: Registrar venta con descuentos y trazabilidad
         public int Registrar(Venta venta)
         {
             if (venta.ClienteId <= 0)
-                throw new ArgumentException("Debe seleccionar un cliente.");
+                throw new ArgumentException(
+                    "Debe seleccionar un cliente.");
+
+            if (string.IsNullOrWhiteSpace(venta.Vendedor))
+                throw new ArgumentException(
+                    "Debe ingresar el nombre del vendedor.");
+
+            if (venta.Vendedor.Trim().Length > 120)
+                throw new ArgumentException(
+                    "El nombre del vendedor no puede superar 120 caracteres.");
 
             if (venta.Detalles == null || venta.Detalles.Count == 0)
-                throw new ArgumentException("Debe agregar al menos un plan.");
+                throw new ArgumentException(
+                    "Debe agregar al menos un plan.");
 
-            if (venta.Detalles.Any(d => d.Cantidad <= 0 || d.ProductoId <= 0))
-                throw new ArgumentException("Los productos y cantidades deben ser válidos.");
+            if (venta.Detalles.Any(d =>
+                d.Cantidad <= 0 || d.ProductoId <= 0))
+                throw new ArgumentException(
+                    "Los productos y cantidades deben ser válidos.");
 
-            if (venta.Detalles.GroupBy(d => d.ProductoId).Any(g => g.Count() > 1))
-                throw new ArgumentException("No puede repetir un mismo plan en la venta.");
+            if (venta.Detalles.GroupBy(d => d.ProductoId)
+                .Any(g => g.Count() > 1))
+                throw new ArgumentException(
+                    "No puede repetir un mismo plan en la venta.");
+
+            if (venta.PorcentajeDescuento < 0 ||
+                venta.PorcentajeDescuento > 20)
+                throw new ArgumentOutOfRangeException(
+                    nameof(venta.PorcentajeDescuento),
+                    "El descuento debe estar entre 0% y 20%.");
+
+            venta.Vendedor = venta.Vendedor.Trim();
 
             using var conexion = new NpgsqlConnection(_conexion);
             conexion.Open();
@@ -47,10 +69,28 @@ namespace GymControl.Data
 
             try
             {
-                // 1. Insertar cabecera de venta
+                // 1. Insertar cabecera inicial de la venta
                 string sqlVenta = @"
-                    INSERT INTO ventas (cliente_id, total, estado)
-                    VALUES (@clienteId, 0, 'Confirmada')
+                    INSERT INTO ventas
+                    (
+                        cliente_id,
+                        total,
+                        estado,
+                        vendedor,
+                        porcentaje_descuento,
+                        monto_descuento,
+                        total_final
+                    )
+                    VALUES
+                    (
+                        @clienteId,
+                        0,
+                        'Confirmada',
+                        @vendedor,
+                        0,
+                        0,
+                        0
+                    )
                     RETURNING id, fecha_venta";
 
                 using (var comandoVenta = new NpgsqlCommand(
@@ -58,6 +98,9 @@ namespace GymControl.Data
                 {
                     comandoVenta.Parameters.AddWithValue(
                         "clienteId", venta.ClienteId);
+
+                    comandoVenta.Parameters.AddWithValue(
+                        "vendedor", venta.Vendedor);
 
                     using var reader = comandoVenta.ExecuteReader();
 
@@ -71,10 +114,9 @@ namespace GymControl.Data
 
                 decimal total = 0;
 
-                // 2. Registrar cada detalle
+                // 2. Registrar cada detalle de la venta
                 foreach (var detalle in venta.Detalles)
                 {
-                    // Obtener precio real desde PostgreSQL
                     string sqlProducto = @"
                         SELECT nombre, precio
                         FROM productos
@@ -91,7 +133,8 @@ namespace GymControl.Data
                         comandoProducto.Parameters.AddWithValue(
                             "productoId", detalle.ProductoId);
 
-                        using var reader = comandoProducto.ExecuteReader();
+                        using var reader =
+                            comandoProducto.ExecuteReader();
 
                         if (!reader.Read())
                         {
@@ -104,15 +147,28 @@ namespace GymControl.Data
                     }
 
                     // Calcular subtotal
-                    decimal subtotal = precio * detalle.Cantidad;
+                    decimal subtotal = Math.Round(
+                        precio * detalle.Cantidad,
+                        2,
+                        MidpointRounding.AwayFromZero);
 
                     string sqlDetalle = @"
                         INSERT INTO detalle_ventas
-                        (venta_id, producto_id, cantidad,
-                         precio_unitario, subtotal)
+                        (
+                            venta_id,
+                            producto_id,
+                            cantidad,
+                            precio_unitario,
+                            subtotal
+                        )
                         VALUES
-                        (@ventaId, @productoId, @cantidad,
-                         @precio, @subtotal)";
+                        (
+                            @ventaId,
+                            @productoId,
+                            @cantidad,
+                            @precio,
+                            @subtotal
+                        )";
 
                     using (var comandoDetalle = new NpgsqlCommand(
                         sqlDetalle, conexion, transaccion))
@@ -143,17 +199,46 @@ namespace GymControl.Data
                     total += subtotal;
                 }
 
-                // 3. Actualizar total de la cabecera
+                // 3. Calcular el total bruto
+                total = Math.Round(
+                    total,
+                    2,
+                    MidpointRounding.AwayFromZero);
+
+                venta.Total = total;
+
+                // 4. Aplicar la regla de descuento del 20%
+                venta.AplicarDescuento(
+                    venta.PorcentajeDescuento);
+
+                // 5. Actualizar todos los importes y vendedor
                 string sqlActualizar = @"
                     UPDATE ventas
-                    SET total = @total
+                    SET
+                        total = @total,
+                        vendedor = @vendedor,
+                        porcentaje_descuento = @porcentaje,
+                        monto_descuento = @montoDescuento,
+                        total_final = @totalFinal
                     WHERE id = @id";
 
                 using (var comandoActualizar = new NpgsqlCommand(
                     sqlActualizar, conexion, transaccion))
                 {
                     comandoActualizar.Parameters.AddWithValue(
-                        "total", total);
+                        "total", venta.Total);
+
+                    comandoActualizar.Parameters.AddWithValue(
+                        "vendedor", venta.Vendedor);
+
+                    comandoActualizar.Parameters.AddWithValue(
+                        "porcentaje", venta.PorcentajeDescuento);
+
+                    comandoActualizar.Parameters.AddWithValue(
+                        "montoDescuento", venta.MontoDescuento);
+
+                    comandoActualizar.Parameters.AddWithValue(
+                        "totalFinal", venta.TotalFinal);
 
                     comandoActualizar.Parameters.AddWithValue(
                         "id", venta.Id);
@@ -161,16 +246,14 @@ namespace GymControl.Data
                     comandoActualizar.ExecuteNonQuery();
                 }
 
-                // 4. Confirmar toda la operación
+                // 6. Confirmar toda la operación
                 transaccion.Commit();
-
-                venta.Total = total;
 
                 return venta.Id;
             }
             catch
             {
-                // 5. Deshacer todo si ocurre un error
+                // 7. Deshacer toda la operación si ocurre un error
                 transaccion.Rollback();
 
                 throw;
@@ -192,7 +275,11 @@ namespace GymControl.Data
                     c.nombres || ' ' || c.apellidos AS nombre_cliente,
                     v.fecha_venta,
                     v.total,
-                    v.estado
+                    v.estado,
+                    v.vendedor,
+                    v.porcentaje_descuento,
+                    v.monto_descuento,
+                    v.total_final
                 FROM ventas v
                 INNER JOIN clientes c
                     ON c.id = v.cliente_id
@@ -208,10 +295,20 @@ namespace GymControl.Data
                     Id = reader.GetInt32(0),
                     ClienteId = reader.GetInt32(1),
                     NombreCliente = reader.GetString(2),
+
                     FechaVenta = new DateTimeOffset(
                         reader.GetDateTime(3)),
+
                     Total = reader.GetDecimal(4),
-                    Estado = reader.GetString(5)
+                    Estado = reader.GetString(5),
+
+                    Vendedor = reader.IsDBNull(6)
+                        ? string.Empty
+                        : reader.GetString(6),
+
+                    PorcentajeDescuento = reader.GetDecimal(7),
+                    MontoDescuento = reader.GetDecimal(8),
+                    TotalFinal = reader.GetDecimal(9)
                 });
             }
 

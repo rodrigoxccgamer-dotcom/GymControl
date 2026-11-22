@@ -14,7 +14,7 @@
 <div class="container mt-4">
 
     <h2>Registrar Nueva Venta</h2>
-    <p>Selecciona un cliente y agrega los planes de gimnasio.</p>
+    <p>Selecciona un cliente, agrega los planes y configura el descuento.</p>
 
     @if (TempData["Mensaje"] != null)
     {
@@ -25,7 +25,8 @@
 
     <form asp-controller="Venta"
           asp-action="Create"
-          method="post">
+          method="post"
+          id="formVenta">
 
         @Html.AntiForgeryToken()
 
@@ -33,7 +34,9 @@
              class="alert alert-danger">
         </div>
 
+        <!-- DATOS GENERALES -->
         <div class="card mb-4">
+
             <div class="card-header">
                 <strong>Datos de la venta</strong>
             </div>
@@ -43,17 +46,14 @@
                 <div class="row">
 
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">
-                            Cliente
-                        </label>
+
+                        <label class="form-label">Cliente</label>
 
                         <select asp-for="ClienteId"
                                 class="form-select"
                                 required>
 
-                            <option value="">
-                                Seleccione un cliente
-                            </option>
+                            <option value="">Seleccione un cliente</option>
 
                             @foreach (var cliente in clientes)
                             {
@@ -61,28 +61,95 @@
                                     @cliente.Nombres @cliente.Apellidos
                                 </option>
                             }
+
                         </select>
+
+                        <span asp-validation-for="ClienteId"
+                              class="text-danger"></span>
+
                     </div>
 
                     <div class="col-md-6 mb-3">
-                        <label class="form-label">
-                            Fecha de venta
-                        </label>
+
+                        <label class="form-label">Fecha de venta</label>
 
                         <input type="text"
                                class="form-control"
                                value="@DateTime.Now.ToString("dd/MM/yyyy HH:mm")"
                                readonly />
+
                     </div>
+
+                    <div class="col-md-6 mb-3">
+
+                        <label asp-for="Vendedor"
+                               class="form-label">
+                            Nombre del vendedor
+                        </label>
+
+                        <input asp-for="Vendedor"
+                               class="form-control"
+                               placeholder="Ingrese el nombre del vendedor"
+                               maxlength="120"
+                               required />
+
+                        <span asp-validation-for="Vendedor"
+                              class="text-danger"></span>
+
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+
+                        <label asp-for="PorcentajeDescuento"
+                               class="form-label">
+                            Porcentaje de descuento
+                        </label>
+
+                        <div class="input-group">
+
+                            <input asp-for="PorcentajeDescuento"
+                                   id="PorcentajeDescuento"
+                                   type="number"
+                                   class="form-control"
+                                   min="0"
+                                   max="20"
+                                   step="0.01"
+                                   required />
+
+                            <span class="input-group-text">%</span>
+
+                        </div>
+
+                        <span asp-validation-for="PorcentajeDescuento"
+                              class="text-danger"></span>
+
+                        <small class="text-muted">
+                            Descuento permitido: desde 0% hasta 20%.
+                        </small>
+
+                    </div>
+
+                </div>
+
+                <!-- MENSAJE AMIGABLE -->
+                <div id="mensajeDescuento"
+                     class="alert alert-warning d-none"
+                     role="alert"
+                     aria-live="polite">
+
+                    El descuento máximo permitido es del 20%.
+                    Ajusta el porcentaje para continuar con la venta.
 
                 </div>
 
             </div>
         </div>
 
+        <!-- DETALLE DE PRODUCTOS -->
         <div class="card mb-4">
 
             <div class="card-header d-flex justify-content-between align-items-center">
+
                 <strong>Detalle de productos</strong>
 
                 <button type="button"
@@ -90,6 +157,7 @@
                         id="agregarProducto">
                     + Agregar plan
                 </button>
+
             </div>
 
             <div class="card-body">
@@ -116,6 +184,7 @@
                                 <tr class="detalle-row">
 
                                     <td>
+
                                         <select name="Detalles[@i].ProductoId"
                                                 class="form-select producto-select"
                                                 required>
@@ -132,37 +201,47 @@
                                                     @producto.Nombre
                                                 </option>
                                             }
+
                                         </select>
+
                                     </td>
 
                                     <td>
+
                                         <input type="text"
                                                class="form-control precio"
                                                value="0.00"
                                                readonly />
+
                                     </td>
 
                                     <td>
+
                                         <input type="number"
                                                name="Detalles[@i].Cantidad"
                                                class="form-control cantidad"
                                                value="@(Model.Detalles[i].Cantidad > 0 ? Model.Detalles[i].Cantidad : 1)"
                                                min="1"
                                                required />
+
                                     </td>
 
                                     <td>
+
                                         <input type="text"
                                                class="form-control subtotal"
                                                value="0.00"
                                                readonly />
+
                                     </td>
 
                                     <td>
+
                                         <button type="button"
                                                 class="btn btn-danger btn-sm eliminar">
                                             Quitar
                                         </button>
+
                                     </td>
 
                                 </tr>
@@ -174,23 +253,47 @@
 
                 </div>
 
-                <div class="text-end mt-3">
+            </div>
+        </div>
 
-                    <h4>
-                        Total:
-                        <span class="text-success">
-                            Bs <span id="totalVenta">0.00</span>
-                        </span>
-                    </h4>
+        <!-- RESUMEN DE LA VENTA -->
+        <div class="card mb-4">
+
+            <div class="card-header">
+                <strong>Resumen de la venta</strong>
+            </div>
+
+            <div class="card-body">
+
+                <div class="row">
+
+                    <div class="col-md-4 mb-3">
+                        <p class="mb-1">Total bruto</p>
+                        <h5>Bs <span id="totalVenta">0.00</span></h5>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <p class="mb-1">Monto descontado</p>
+                        <h5>Bs <span id="montoDescuento">0.00</span></h5>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <p class="mb-1">Total final a pagar</p>
+                        <h4>
+                            Bs <span id="totalFinal">0.00</span>
+                        </h4>
+                    </div>
 
                 </div>
 
             </div>
         </div>
 
+        <!-- BOTONES -->
         <div class="d-flex gap-2 mb-5">
 
             <button type="submit"
+                    id="confirmarVenta"
                     class="btn btn-success">
                 Confirmar venta
             </button>
@@ -207,18 +310,18 @@
 
 </div>
 
+<!-- PLANTILLA PARA AGREGAR PLANES -->
 <template id="detalleTemplate">
 
     <tr class="detalle-row">
 
         <td>
+
             <select name="Detalles[__index__].ProductoId"
                     class="form-select producto-select"
                     required>
 
-                <option value="">
-                    Seleccione un plan
-                </option>
+                <option value="">Seleccione un plan</option>
 
                 @foreach (var producto in productos)
                 {
@@ -229,6 +332,7 @@
                 }
 
             </select>
+
         </td>
 
         <td>
@@ -269,12 +373,30 @@
 
     <script>
 
-        const detalleBody = document.getElementById("detalleBody");
-        const template = document.getElementById("detalleTemplate");
+        const detalleBody =
+            document.getElementById("detalleBody");
 
+        const template =
+            document.getElementById("detalleTemplate");
+
+        const porcentajeInput =
+            document.getElementById("PorcentajeDescuento");
+
+        const mensajeDescuento =
+            document.getElementById("mensajeDescuento");
+
+        const confirmarVenta =
+            document.getElementById("confirmarVenta");
+
+        const formVenta =
+            document.getElementById("formVenta");
+
+
+        // ACTUALIZAR INDICES DE LOS DETALLES
         function actualizarIndices() {
 
-            const filas = detalleBody.querySelectorAll(".detalle-row");
+            const filas =
+                detalleBody.querySelectorAll(".detalle-row");
 
             filas.forEach((fila, index) => {
 
@@ -291,74 +413,156 @@
 
         }
 
+
+        // CALCULAR SUBTOTAL DE CADA PLAN
         function calcularFila(fila) {
 
-            const select = fila.querySelector(".producto-select");
-            const cantidadInput = fila.querySelector(".cantidad");
+            const select =
+                fila.querySelector(".producto-select");
 
-            const opcion = select.options[select.selectedIndex];
+            const cantidadInput =
+                fila.querySelector(".cantidad");
 
-            const precio = parseFloat(opcion?.dataset.precio || 0);
-            const cantidad = parseInt(cantidadInput.value) || 0;
+            const opcion =
+                select.options[select.selectedIndex];
 
-            const subtotal = precio * cantidad;
+            const precio =
+                parseFloat(opcion?.dataset.precio || 0);
 
-            fila.querySelector(".precio").value = precio.toFixed(2);
-            fila.querySelector(".subtotal").value = subtotal.toFixed(2);
+            const cantidad =
+                parseInt(cantidadInput.value) || 0;
+
+            const subtotal =
+                precio * cantidad;
+
+            fila.querySelector(".precio").value =
+                precio.toFixed(2);
+
+            fila.querySelector(".subtotal").value =
+                subtotal.toFixed(2);
 
             calcularTotal();
+
         }
 
+
+        // CALCULAR DESCUENTO Y TOTAL FINAL
         function calcularTotal() {
 
             let total = 0;
 
-            detalleBody.querySelectorAll(".subtotal").forEach(input => {
+            detalleBody.querySelectorAll(".subtotal")
+                .forEach(input => {
 
-                total += parseFloat(input.value) || 0;
+                    total += parseFloat(input.value) || 0;
 
-            });
+                });
+
+            const porcentaje =
+                Number(porcentajeInput.value);
+
+            const porcentajeValido =
+                porcentajeInput.value.trim() !== "" &&
+                Number.isFinite(porcentaje) &&
+                porcentaje >= 0 &&
+                porcentaje <= 20;
+
+            const totalRedondeado =
+                Math.round((total + Number.EPSILON) * 100) / 100;
+
+            let descuento = 0;
+            let totalFinal = totalRedondeado;
+
+            if (porcentajeValido) {
+
+                descuento = Math.round(
+                    (totalRedondeado * porcentaje / 100 +
+                    Number.EPSILON) * 100
+                ) / 100;
+
+                totalFinal = totalRedondeado - descuento;
+
+            }
 
             document.getElementById("totalVenta").textContent =
-                total.toFixed(2);
+                totalRedondeado.toFixed(2);
+
+            document.getElementById("montoDescuento").textContent =
+                descuento.toFixed(2);
+
+            document.getElementById("totalFinal").textContent =
+                porcentajeValido
+                    ? totalFinal.toFixed(2)
+                    : "—";
+
+            // BLOQUEO AMIGABLE DEL DESCUENTO INVÁLIDO
+            if (!porcentajeValido) {
+
+                mensajeDescuento.classList.remove("d-none");
+                confirmarVenta.disabled = true;
+
+            } else {
+
+                mensajeDescuento.classList.add("d-none");
+                confirmarVenta.disabled = false;
+
+            }
+
         }
 
+
+        // AGREGAR PLAN
         document.getElementById("agregarProducto")
             .addEventListener("click", function () {
 
-                const indice = detalleBody.querySelectorAll(".detalle-row").length;
+                const indice =
+                    detalleBody.querySelectorAll(".detalle-row").length;
 
                 const html = template.innerHTML.replaceAll(
                     "__index__",
                     indice
                 );
 
-                detalleBody.insertAdjacentHTML("beforeend", html);
+                detalleBody.insertAdjacentHTML(
+                    "beforeend",
+                    html
+                );
 
                 actualizarIndices();
                 calcularTotal();
+
             });
 
+
+        // CAMBIO DE PRODUCTO
         detalleBody.addEventListener("change", function (e) {
 
             if (e.target.classList.contains("producto-select")) {
 
-                calcularFila(e.target.closest(".detalle-row"));
+                calcularFila(
+                    e.target.closest(".detalle-row")
+                );
 
             }
 
         });
 
+
+        // CAMBIO DE CANTIDAD
         detalleBody.addEventListener("input", function (e) {
 
             if (e.target.classList.contains("cantidad")) {
 
-                calcularFila(e.target.closest(".detalle-row"));
+                calcularFila(
+                    e.target.closest(".detalle-row")
+                );
 
             }
 
         });
 
+
+        // ELIMINAR PLAN
         detalleBody.addEventListener("click", function (e) {
 
             if (e.target.classList.contains("eliminar")) {
@@ -372,9 +576,58 @@
 
         });
 
-        detalleBody.querySelectorAll(".detalle-row").forEach(fila => {
-            calcularFila(fila);
+
+        // CAMBIO DE PORCENTAJE
+        porcentajeInput.addEventListener("input", function () {
+
+            calcularTotal();
+
         });
+
+
+        // VALIDACION FINAL ANTES DE ENVIAR
+        formVenta.addEventListener("submit", function (e) {
+
+            const porcentaje =
+                Number(porcentajeInput.value);
+
+            if (
+                porcentajeInput.value.trim() === "" ||
+                !Number.isFinite(porcentaje) ||
+                porcentaje < 0 ||
+                porcentaje > 20
+            ) {
+
+                e.preventDefault();
+
+                mensajeDescuento.classList.remove("d-none");
+
+                porcentajeInput.focus();
+
+                return;
+
+            }
+
+            if (detalleBody.querySelectorAll(".detalle-row").length === 0) {
+
+                e.preventDefault();
+
+                alert("Agrega al menos un plan para registrar la venta.");
+
+            }
+
+        });
+
+
+        // CALCULAR LOS VALORES INICIALES
+        detalleBody.querySelectorAll(".detalle-row")
+            .forEach(fila => {
+
+                calcularFila(fila);
+
+            });
+
+        calcularTotal();
 
     </script>
 
