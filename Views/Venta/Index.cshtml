@@ -18,6 +18,13 @@
         </div>
     }
 
+    @if (TempData["Error"] != null)
+    {
+        <div class="alert alert-danger">
+            @TempData["Error"]
+        </div>
+    }
+
     <a asp-controller="Venta"
        asp-action="Create"
        class="btn btn-primary mb-3">
@@ -32,8 +39,12 @@
                 <tr>
                     <th>N.º Venta</th>
                     <th>Cliente</th>
+                    <th>Vendedor</th>
                     <th>Fecha</th>
-                    <th>Total (Bs)</th>
+                    <th>Total bruto (Bs)</th>
+                    <th>Descuento (%)</th>
+                    <th>Monto descontado (Bs)</th>
+                    <th>Total final (Bs)</th>
                     <th>Estado</th>
                 </tr>
             </thead>
@@ -42,10 +53,16 @@
 
                 @foreach (var venta in Model)
                 {
+                    var totalFinalMostrar = venta.TotalFinal > 0
+                        ? venta.TotalFinal
+                        : venta.Total - venta.MontoDescuento;
+
                     <tr>
                         <td>@venta.Id</td>
 
                         <td>@venta.NombreCliente</td>
+
+                        <td>@venta.Vendedor</td>
 
                         <td>
                             @venta.FechaVenta.ToString("dd/MM/yyyy HH:mm")
@@ -53,6 +70,18 @@
 
                         <td>
                             @venta.Total.ToString("N2")
+                        </td>
+
+                        <td>
+                            @venta.PorcentajeDescuento.ToString("0.##")%
+                        </td>
+
+                        <td>
+                            @venta.MontoDescuento.ToString("N2")
+                        </td>
+
+                        <td class="fw-bold text-success">
+                            @totalFinalMostrar.ToString("N2")
                         </td>
 
                         <td>

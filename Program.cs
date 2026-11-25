@@ -3,25 +3,22 @@ using GymControl.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
 builder.Services.AddControllersWithViews();
 
-builder.Services.AddScoped<GymControl.Data.ClienteDAO>();
-builder.Services.AddScoped<GymControl.Data.MembresiaDAO>();
-builder.Services.AddScoped<GymControl.Data.PagoDAO>();
-
+builder.Services.AddScoped<ClienteDAO>();
+builder.Services.AddScoped<MembresiaDAO>();
+builder.Services.AddScoped<PagoDAO>();
 builder.Services.AddScoped<ProductoDAO>();
 builder.Services.AddScoped<VentaDAO>();
 
-
+// Actividad 10: Reportes
+builder.Services.AddScoped<ReporteDAO>();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Error");
-    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
     app.UseHsts();
 }
 
@@ -36,6 +33,5 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}")
     .WithStaticAssets();
-
 
 app.Run();

@@ -14,13 +14,17 @@ namespace GymControl.Data
 
         public VentaDAO(IConfiguration config)
         {
-            var baseConexion = config.GetConnectionString("PostgreSQL");
-            var password = config["ConnectionStrings:PostgreSQLPassword"];
+            var baseConexion =
+                config.GetConnectionString("PostgreSQL");
 
-            var builder = new NpgsqlConnectionStringBuilder(baseConexion)
-            {
-                Password = password
-            };
+            var password =
+                config["ConnectionStrings:PostgreSQLPassword"];
+
+            var builder =
+                new NpgsqlConnectionStringBuilder(baseConexion)
+                {
+                    Password = password
+                };
 
             _conexion = builder.ConnectionString;
         }
@@ -28,6 +32,11 @@ namespace GymControl.Data
         // CREATE: Registrar venta con descuentos y trazabilidad
         public int Registrar(Venta venta)
         {
+            // 1. CLÁUSULAS DE GUARDA
+
+            if (venta == null)
+                throw new ArgumentNullException(nameof(venta));
+
             if (venta.ClienteId <= 0)
                 throw new ArgumentException(
                     "Debe seleccionar un cliente.");
@@ -45,7 +54,7 @@ namespace GymControl.Data
                     "Debe agregar al menos un plan.");
 
             if (venta.Detalles.Any(d =>
-                d.Cantidad <= 0 || d.ProductoId <= 0))
+                d == null || d.Cantidad <= 0 || d.ProductoId <= 0))
                 throw new ArgumentException(
                     "Los productos y cantidades deben ser válidos.");
 
@@ -62,14 +71,20 @@ namespace GymControl.Data
 
             venta.Vendedor = venta.Vendedor.Trim();
 
-            using var conexion = new NpgsqlConnection(_conexion);
-            conexion.Open();
-
-            using var transaccion = conexion.BeginTransaction();
+            NpgsqlConnection? conexion = null;
+            NpgsqlTransaction? transaccion = null;
 
             try
             {
-                // 1. Insertar cabecera inicial de la venta
+                // 2. Abrir conexión y transacción
+
+                conexion = new NpgsqlConnection(_conexion);
+                conexion.Open();
+
+                transaccion = conexion.BeginTransaction();
+
+                // 3. Insertar cabecera de venta
+
                 string sqlVenta = @"
                     INSERT INTO ventas
                     (
@@ -104,7 +119,9 @@ namespace GymControl.Data
 
                     using var reader = comandoVenta.ExecuteReader();
 
-                    reader.Read();
+                    if (!reader.Read())
+                        throw new InvalidOperationException(
+                            "No se pudo generar el registro de venta.");
 
                     venta.Id = reader.GetInt32(0);
 
@@ -114,7 +131,8 @@ namespace GymControl.Data
 
                 decimal total = 0;
 
-                // 2. Registrar cada detalle de la venta
+                // 4. Registrar los detalles
+
                 foreach (var detalle in venta.Detalles)
                 {
                     string sqlProducto = @"
@@ -137,16 +155,13 @@ namespace GymControl.Data
                             comandoProducto.ExecuteReader();
 
                         if (!reader.Read())
-                        {
                             throw new InvalidOperationException(
                                 "El plan seleccionado no existe o está inactivo.");
-                        }
 
                         nombreProducto = reader.GetString(0);
                         precio = reader.GetDecimal(1);
                     }
 
-                    // Calcular subtotal
                     decimal subtotal = Math.Round(
                         precio * detalle.Cantidad,
                         2,
@@ -199,7 +214,8 @@ namespace GymControl.Data
                     total += subtotal;
                 }
 
-                // 3. Calcular el total bruto
+                // 5. Calcular total bruto
+
                 total = Math.Round(
                     total,
                     2,
@@ -207,11 +223,13 @@ namespace GymControl.Data
 
                 venta.Total = total;
 
-                // 4. Aplicar la regla de descuento del 20%
+                // 6. Aplicar descuento máximo del 20%
+
                 venta.AplicarDescuento(
                     venta.PorcentajeDescuento);
 
-                // 5. Actualizar todos los importes y vendedor
+                // 7. Actualizar cabecera
+
                 string sqlActualizar = @"
                     UPDATE ventas
                     SET
@@ -246,73 +264,176 @@ namespace GymControl.Data
                     comandoActualizar.ExecuteNonQuery();
                 }
 
-                // 6. Confirmar toda la operación
+                // 8. Confirmar transacción
+
                 transaccion.Commit();
 
                 return venta.Id;
             }
-            catch
+
+            // 9. Excepción específica de PostgreSQL
+
+            catch (PostgresException ex)
             {
-                // 7. Deshacer toda la operación si ocurre un error
-                transaccion.Rollback();
+                RevertirYRegistrar(
+                    ex, transaccion, "Registrar venta");
 
                 throw;
             }
+
+            // 10. Error de conexión o infraestructura
+
+            catch (NpgsqlException ex)
+            {
+                RevertirYRegistrar(
+                    ex, transaccion, "Registrar venta");
+
+                throw;
+            }
+
+            // 11. Cualquier otro error
+
+            catch (Exception ex)
+            {
+                RevertirYRegistrar(
+                    ex, transaccion, "Registrar venta");
+
+                throw;
+            }
+
+            // 12. Liberar recursos
+
+            finally
+            {
+                transaccion?.Dispose();
+                conexion?.Dispose();
+            }
+        }
+
+        // MÉTODO AUXILIAR: Revertir y registrar errores
+
+        private void RevertirYRegistrar(
+            Exception ex,
+            NpgsqlTransaction? transaccion,
+            string operacion)
+        {
+            if (transaccion != null)
+            {
+                try
+                {
+                    transaccion.Rollback();
+                }
+                catch (Exception errorRollback)
+                {
+                    ErrorLogger.Registrar(
+                        errorRollback,
+                        "Rollback de registro de venta");
+                }
+            }
+
+            ErrorLogger.Registrar(ex, operacion);
         }
 
         // READ: Obtener historial de ventas
+
         public List<Venta> ObtenerTodas()
         {
             var lista = new List<Venta>();
 
-            using var conexion = new NpgsqlConnection(_conexion);
-            conexion.Open();
+            NpgsqlConnection? conexion = null;
+            NpgsqlCommand? comando = null;
+            NpgsqlDataReader? reader = null;
 
-            string sql = @"
-                SELECT
-                    v.id,
-                    v.cliente_id,
-                    c.nombres || ' ' || c.apellidos AS nombre_cliente,
-                    v.fecha_venta,
-                    v.total,
-                    v.estado,
-                    v.vendedor,
-                    v.porcentaje_descuento,
-                    v.monto_descuento,
-                    v.total_final
-                FROM ventas v
-                INNER JOIN clientes c
-                    ON c.id = v.cliente_id
-                ORDER BY v.id DESC";
-
-            using var comando = new NpgsqlCommand(sql, conexion);
-            using var reader = comando.ExecuteReader();
-
-            while (reader.Read())
+            try
             {
-                lista.Add(new Venta
+                conexion = new NpgsqlConnection(_conexion);
+                conexion.Open();
+
+                string sql = @"
+                    SELECT
+                        v.id,
+                        v.cliente_id,
+                        c.nombres || ' ' || c.apellidos AS nombre_cliente,
+                        v.fecha_venta,
+                        v.total,
+                        v.estado,
+                        v.vendedor,
+                        v.porcentaje_descuento,
+                        v.monto_descuento,
+                        v.total_final
+                    FROM ventas v
+                    INNER JOIN clientes c
+                        ON c.id = v.cliente_id
+                    ORDER BY v.id DESC";
+
+                comando = new NpgsqlCommand(sql, conexion);
+                reader = comando.ExecuteReader();
+
+                while (reader.Read())
                 {
-                    Id = reader.GetInt32(0),
-                    ClienteId = reader.GetInt32(1),
-                    NombreCliente = reader.GetString(2),
+                    lista.Add(new Venta
+                    {
+                        Id = reader.GetInt32(0),
+                        ClienteId = reader.GetInt32(1),
+                        NombreCliente = reader.GetString(2),
 
-                    FechaVenta = new DateTimeOffset(
-                        reader.GetDateTime(3)),
+                        FechaVenta = new DateTimeOffset(
+                            reader.GetDateTime(3)),
 
-                    Total = reader.GetDecimal(4),
-                    Estado = reader.GetString(5),
+                        Total = reader.GetDecimal(4),
+                        Estado = reader.GetString(5),
 
-                    Vendedor = reader.IsDBNull(6)
-                        ? string.Empty
-                        : reader.GetString(6),
+                        Vendedor = reader.IsDBNull(6)
+                            ? string.Empty
+                            : reader.GetString(6),
 
-                    PorcentajeDescuento = reader.GetDecimal(7),
-                    MontoDescuento = reader.GetDecimal(8),
-                    TotalFinal = reader.GetDecimal(9)
-                });
+                        PorcentajeDescuento = reader.GetDecimal(7),
+                        MontoDescuento = reader.GetDecimal(8),
+                        TotalFinal = reader.GetDecimal(9)
+                    });
+                }
+
+                return lista;
             }
 
-            return lista;
+            // Error específico de PostgreSQL
+
+            catch (PostgresException ex)
+            {
+                ErrorLogger.Registrar(
+                    ex, "Consultar historial de ventas");
+
+                throw;
+            }
+
+            // Error de conexión
+
+            catch (NpgsqlException ex)
+            {
+                ErrorLogger.Registrar(
+                    ex, "Consultar historial de ventas");
+
+                throw;
+            }
+
+            // Error general
+
+            catch (Exception ex)
+            {
+                ErrorLogger.Registrar(
+                    ex, "Consultar historial de ventas");
+
+                throw;
+            }
+
+            // Liberar recursos
+
+            finally
+            {
+                reader?.Dispose();
+                comando?.Dispose();
+                conexion?.Dispose();
+            }
         }
     }
 }

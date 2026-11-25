@@ -1,0 +1,317 @@
+
+@using System
+@using System.Data
+@using System.Linq
+
+@{
+    ViewData["Title"] = "Reporte de Ventas";
+
+    var reporte = ViewBag.Reporte as DataTable
+                  ?? new DataTable();
+
+    string tipo = ViewBag.TipoGranularidad ?? "Diario";
+    string inicio = ViewBag.FechaInicio ?? "";
+    string fin = ViewBag.FechaFin ?? "";
+
+    int totalOperaciones = 0;
+    decimal totalBruto = 0;
+    decimal totalDescuentos = 0;
+    decimal totalCobrado = 0;
+}
+
+<div class="container mt-4 mb-5">
+
+    <!-- HEADER DEL REPORTE -->
+    <div class="text-center mb-4">
+
+        <h2 class="fw-bold">GymControl</h2>
+
+        <h3>Reporte de Ventas</h3>
+
+        <p>
+            Periodo: @inicio hasta @fin
+        </p>
+
+        <p>
+            Tipo de reporte: <strong>@tipo</strong>
+        </p>
+
+        <small>
+            Fecha de emisión: @DateTime.Now.ToString("dd/MM/yyyy HH:mm")
+        </small>
+
+        <br />
+
+        <small>
+            Usuario: @(User.Identity?.Name ?? "Usuario del sistema")
+        </small>
+
+    </div>
+
+    <!-- FILTROS -->
+    <form method="get"
+          asp-controller="VentaReporte"
+          asp-action="Index"
+          class="card card-body mb-4 no-print">
+
+        <div class="row g-3">
+
+            <div class="col-md-3">
+                <label class="form-label">Fecha inicial</label>
+                <input type="date"
+                       name="fechaInicio"
+                       value="@inicio"
+                       class="form-control"
+                       required />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Fecha final</label>
+                <input type="date"
+                       name="fechaFin"
+                       value="@fin"
+                       class="form-control"
+                       required />
+            </div>
+
+            <div class="col-md-3">
+                <label class="form-label">Granularidad</label>
+
+                <select name="tipoGranularidad"
+                        class="form-select">
+
+                    @if (tipo == "Diario")
+                    {
+                        <option value="Diario" selected>Diario</option>
+                        <option value="Mensual">Mensual</option>
+                    }
+                    else
+                    {
+                        <option value="Diario">Diario</option>
+                        <option value="Mensual" selected>Mensual</option>
+                    }
+
+                </select>
+            </div>
+
+            <div class="col-md-3 d-flex align-items-end">
+
+                <button type="submit"
+                        class="btn btn-primary w-100">
+                    Consultar
+                </button>
+
+            </div>
+
+        </div>
+
+    </form>
+
+    <!-- MENSAJES -->
+    @if (ViewBag.Error != null)
+    {
+        <div class="alert alert-danger">
+            @ViewBag.Error
+        </div>
+    }
+
+    @if (ViewBag.Mensaje != null)
+    {
+        <div class="alert alert-info">
+            @ViewBag.Mensaje
+        </div>
+    }
+
+    <!-- RESULTADOS -->
+    @if (reporte.Rows.Count > 0)
+    {
+        <div class="table-responsive">
+
+            <table class="table table-bordered table-striped">
+
+                @if (tipo == "Diario")
+                {
+                    <thead class="table-dark">
+                        <tr>
+                            <th>N.º Venta</th>
+                            <th>Hora</th>
+                            <th>Cliente</th>
+                            <th>Vendedor</th>
+                            <th>Total bruto (Bs)</th>
+                            <th>Descuento (%)</th>
+                            <th>Descontado (Bs)</th>
+                            <th>Total final (Bs)</th>
+                            <th>Estado</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (var grupo in reporte.AsEnumerable()
+                            .GroupBy(f => Convert.ToString(f["periodo_grupo"])))
+                        {
+                            decimal subtotalDescuento = 0;
+                            decimal subtotalCobrado = 0;
+                            int cantidad = 0;
+
+                            <tr class="table-secondary">
+                                <td colspan="9">
+                                    <strong>Fecha: @grupo.Key</strong>
+                                </td>
+                            </tr>
+
+                            @foreach (DataRow fila in grupo)
+                            {
+                                decimal bruto = Convert.ToDecimal(fila["total_bruto"]);
+                                decimal descuento = Convert.ToDecimal(fila["monto_descuento"]);
+                                decimal cobrado = Convert.ToDecimal(fila["total_final"]);
+
+                                subtotalDescuento += descuento;
+                                subtotalCobrado += cobrado;
+
+                                totalBruto += bruto;
+                                totalDescuentos += descuento;
+                                totalCobrado += cobrado;
+
+                                cantidad++;
+                                totalOperaciones++;
+
+                                <tr>
+                                    <td>@fila["nro_venta"]</td>
+                                    <td>@fila["hora"]</td>
+                                    <td>@fila["cliente"]</td>
+                                    <td>@fila["vendedor"]</td>
+                                    <td>@bruto.ToString("N2")</td>
+                                    <td>@fila["porcentaje_descuento"]%</td>
+                                    <td>@descuento.ToString("N2")</td>
+                                    <td>@cobrado.ToString("N2")</td>
+                                    <td>@fila["estado"]</td>
+                                </tr>
+                            }
+
+                            <!-- GROUP FOOTER -->
+                            <tr class="table-light fw-bold">
+                                <td colspan="4">
+                                    Subtotal del día (@cantidad ventas)
+                                </td>
+                                <td colspan="2">Descuentos:</td>
+                                <td>@subtotalDescuento.ToString("N2")</td>
+                                <td colspan="2">
+                                    Cobrado: Bs @subtotalCobrado.ToString("N2")
+                                </td>
+                            </tr>
+                        }
+
+                    </tbody>
+                }
+                else
+                {
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Mes</th>
+                            <th>Cantidad de ventas</th>
+                            <th>Total bruto (Bs)</th>
+                            <th>Descuentos (Bs)</th>
+                            <th>Total cobrado (Bs)</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+
+                        @foreach (DataRow fila in reporte.Rows)
+                        {
+                            int cantidad = Convert.ToInt32(fila["cantidad_ventas"]);
+                            decimal bruto = Convert.ToDecimal(fila["total_bruto"]);
+                            decimal descuento = Convert.ToDecimal(fila["total_descuentos"]);
+                            decimal cobrado = Convert.ToDecimal(fila["total_cobrado"]);
+
+                            totalOperaciones += cantidad;
+                            totalBruto += bruto;
+                            totalDescuentos += descuento;
+                            totalCobrado += cobrado;
+
+                            <tr>
+                                <td>@fila["periodo_mes"]</td>
+                                <td>@cantidad</td>
+                                <td>@bruto.ToString("N2")</td>
+                                <td>@descuento.ToString("N2")</td>
+                                <td>@cobrado.ToString("N2")</td>
+                            </tr>
+                        }
+
+                    </tbody>
+                }
+
+                <!-- REPORT FOOTER -->
+                <tfoot class="table-dark fw-bold">
+                    <tr>
+                        <td colspan="@(tipo == "Diario" ? 4 : 1)">
+                            TOTAL GENERAL
+                        </td>
+
+                        @if (tipo == "Diario")
+                        {
+                            <td>@totalBruto.ToString("N2")</td>
+                            <td></td>
+                            <td>@totalDescuentos.ToString("N2")</td>
+                            <td>@totalCobrado.ToString("N2")</td>
+                            <td></td>
+                        }
+                        else
+                        {
+                            <td>@totalOperaciones</td>
+                            <td>@totalBruto.ToString("N2")</td>
+                            <td>@totalDescuentos.ToString("N2")</td>
+                            <td>@totalCobrado.ToString("N2")</td>
+                        }
+                    </tr>
+                </tfoot>
+
+            </table>
+
+        </div>
+
+        <div class="mb-3">
+            <strong>Total de operaciones:</strong> @totalOperaciones
+            <br />
+            <strong>Total cobrado:</strong>
+            Bs @totalCobrado.ToString("N2")
+        </div>
+
+        <button onclick="window.print()"
+                class="btn btn-success no-print">
+            Imprimir / Guardar PDF
+        </button>
+    }
+
+</div>
+
+<style>
+    @@media print {
+        .no-print {
+            display: none !important;
+        }
+
+        body {
+            font-size: 10px;
+        }
+
+        .container {
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+
+        table {
+            font-size: 9px;
+        }
+
+        @@page {
+            size: landscape;
+            margin: 12mm;
+
+            @@bottom-right {
+                content: "Página " counter(page) " de " counter(pages);
+            }
+        }
+    }
+</style>
